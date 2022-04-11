@@ -13,7 +13,7 @@ float degreesC = 0;
 float degreesF = 0;  
 const int button2Pin = 2;  // pushbutton 2 pin
 
-int buttonCnt = 0;
+int buttonCnt = 0; //488.
 int buttonState, prevbuttonState =0;
 int red_light_pin= 5;
 int green_light_pin = 4;
@@ -36,7 +36,7 @@ void setup()
   float calibrationValue; // calibration value (see example file "Calibration.ino")
   calibrationValue = 696.0; // uncomment this if you want to set the calibration value in the sketch
 #if defined(ESP8266)|| defined(ESP32)
-  //EEPROM.begin(512); // uncomment this if you use ESP8266/ESP32 and want to fetch the calibration value from eeprom
+ // EEPROM.begin(512); // uncomment this if you use ESP8266/ESP32 and want to fetch the calibration value from eeprom
 #endif
   EEPROM.get(calVal_eepromAdress, calibrationValue); // uncomment this if you want to fetch the calibration value from eeprom
   long stabilizingtime = 2000; // preciscion right after power-up can be improved by adding a few seconds of stabilizing time
@@ -78,33 +78,56 @@ void loop()
      scale.tare();  //Reset the scale to zero      
  }
  */
+ static boolean newDataReady = 0;
+  const int serialPrintInterval = 1000; 
   if(LoadCell.update()){
-    float i = LoadCell.getData();
+    newDataReady = true;
+  }
+  if(newDataReady){
+    if (millis() > t + serialPrintInterval) {
+          float i = LoadCell.getData();
+          i = i/28.35;
+          newDataReady = 0;
+          t = millis();
+          lcd.setCursor(0, 0);                      //set the cursor to the lower left position
+          lcd.print("Weight: ");
+          lcd.print(i);
+          lcd.print(" oz");
+          newDataReady = 0;
+          t = millis();
+        }
+  }
+
+//old code
+/*
+     if(millis() > t +PrintInterval)
+      float i = LoadCell.getData();
     Serial.println(i, " ");
-    delay(1000);
     lcd.clear();
+    delay(300);
     lcd.setCursor(0, 0);                      //set the cursor to the lower left position
     lcd.print("Weight: ");
     lcd.print(i);
-  }
- 
-   voltage = analogRead(A0) * 0.004882813;   
+    */
+
+    //comment
+  voltage = analogRead(A0) * 0.004882813;   
   degreesC = (voltage - 0.5) * 100.0;      
   degreesF = degreesC * (9.0 / 5.0) + 32.0; 
-  delay(200);
+ // delay(200);
   
   buttonState = digitalRead(button2Pin);
   if(buttonState != prevbuttonState){
     if(buttonState == HIGH){
       buttonCnt++;  // if button is pressed increase count
     }
-    if(buttonCnt == 5){
+    if(buttonCnt == 4){
       buttonCnt = 0; // we only have 3 states so we want to bring it back down to 0 after it hits 3 (remember index starts at 0)
     }
     delay(50); // this code executes fast, we want it to slow down a little bit so we make it wait 50 mili here
     Serial.print(buttonCnt);
 
-    
+   
   }
   prevbuttonState = buttonState; //We want to save button state so that we only iterate when button state differs. 
 
@@ -143,9 +166,13 @@ void loop()
 
   // Now let's use the above functions to combine them into one statement:
 
-  if(buttonCnt == 1) // pushing button 1 AND button 2                                                     // then...
+  float low, high;
+
+  if(buttonCnt == 1) // Chicken                                                 // then...
   {
     RGB_color(255, 0, 0); // Red
+    low = 8.0;
+    high = 8.3;
     /*
     lcd.clear();
     lcd.setCursor(0, 0);                      //set the cursor to the top left position
@@ -157,10 +184,12 @@ void loop()
 
 
   }
-  if(buttonCnt == 0)
+  if(buttonCnt == 0) //Bits
   {
 
-  RGB_color(0, 255, 0); // Green
+  RGB_color(0, 0, 255); // Blue
+  low = 8.0;
+  high = 8.1;
   /*
   lcd.clear();
   lcd.setCursor(0, 0);                      //set the cursor to the lower left position
@@ -171,10 +200,12 @@ void loop()
   */
 
   }
-   if(buttonCnt == 2)
+   if(buttonCnt == 2) //Sweet Potatoes
   {
   
-  RGB_color(0, 0, 255); // Blue
+  RGB_color(0, 255, 0); // Green
+  low = 8.0;
+  high = 8.3;
   /*
   lcd.clear();
   lcd.setCursor(0, 0);                      //set the cursor to the lower left position
@@ -185,9 +216,11 @@ void loop()
   */
 
   }
-if(buttonCnt == 3) // pushing button 1 AND button 2                                                     // then...
+if(buttonCnt == 3) // PB                                                  // then...
   {
     RGB_color(255, 255, 0); // Yellow
+    low = 8.4;
+    high = 8.7;
     /*
     lcd.clear();
     lcd.setCursor(0, 0);                      //set the cursor to the lower left position
@@ -198,19 +231,17 @@ if(buttonCnt == 3) // pushing button 1 AND button 2                             
     */
 
   }
-if(buttonCnt == 4) // pushing button 1 AND button 2  
-{RGB_color(0, 0, 0);
 
    /*
-   lcd.clear();
-  lcd.setCursor(0, 0);                      //set the cursor to the lower left position
-  lcd.print("Degrees F: ");                 //Print a label for the data
-  lcd.print("10000000"); 
-  lcd.setCursor(0, 1);                      //set the cursor to the lower left position
-  lcd.print("OFF");
-  */
-  
-}  
+   if(low <= weight && weight <= high){ //solid range
+    
+   }
+   if(low > weight){ // add more
+    
+   }
+    if(high < weight){ // take out
+    
+   }*/
   // As you can see, logic operators can be combined to make
   // complex decisions!
 
