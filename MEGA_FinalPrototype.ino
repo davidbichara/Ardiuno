@@ -20,7 +20,6 @@ HX711_ADC LoadCell(HX711_dout, HX711_sck);
 
 MCUFRIEND_kbv tft;
 
-int delayPeriod;
 const int calVal_eepromAdress = 0;
 long t;
 long stabilizingtime;
@@ -33,18 +32,19 @@ float degreesF = 0;  */
 float calibrationValue;
 const int button2Pin = 43;  // UNO 2
 const int button1 = 45; //UNO 1
+int change = -5, lastchange = 0;
 
-int buttonCnt = 0; //488.
-int buttonState, buttonState1,prevbuttonState1 = 0, prevbuttonState =0;
+int buttonCnt = -1; //488.
+int buttonState, buttonState1,prevbuttonState1 = 1, prevbuttonState =0;
 int red_light_pin= 37; // UNO 5 
 int green_light_pin = 39; // UNO 4
 int blue_light_pin = 41; // UNO 3 41
 int red_light_pin_2= 25; // UNO 5 
 int green_light_pin_2 = 27; // UNO 4
 int blue_light_pin_2 = 29; // UNO 3 41
-int offset = 0;
 float tempweight;
-boolean _tare;
+float previ;
+boolean setprevi = false;
 
 void setup()
 {
@@ -61,13 +61,13 @@ void setup()
  // lcd.clear(); 
   
   LoadCell.begin(); // calibration value (see example file "Calibration.ino")
-  calibrationValue = -480.40; // uncomment this if you want to set the calibration value in the sketch
+  calibrationValue = -480.40; // uncomment this if you want to set the calibration value in the sketch //696.0
 //#if defined(ESP8266)|| defined(ESP32)
 //  EEPROM.begin(512); // uncomment this if you use ESP8266/ESP32 and want to fetch the calibration value from eeprom
 //#endif
   EEPROM.get(calVal_eepromAdress, calibrationValue); // uncomment this if you want to fetch the calibration value from eeprom
-  stabilizingtime = 2000; // preciscion right after power-up can be improved by adding a few seconds of stabilizing time
-  _tare = true; //set this to false if you don't want tare to be performed in the next step
+  stabilizingtime = 2000; // preciscion right after power-up can be improved by adding a few seconds of stabilizing time was 2000
+  boolean _tare = true; //set this to false if you don't want tare to be performed in the next step
   LoadCell.start(stabilizingtime, _tare);
   if (LoadCell.getTareTimeoutFlag())
   {
@@ -84,9 +84,6 @@ void setup()
   tft.begin(ID);
   tft.setCursor(0,0);
   tft.fillScreen(BLACK);
-  tft.setTextColor(WHITE);
-  tft.setTextSize(3);
-  tft.println("Weight: ");
 }
 
 
@@ -104,24 +101,16 @@ void loop()
    //displays the weight in 4 decimal places only for calibration
   float i;
   static boolean newDataReady = 0;
-  const int serialPrintInterval = 1000; 
+  const int serialPrintInterval = 500; // was 1000
   if(LoadCell.update()){
     newDataReady = true;
   }
   if(newDataReady){
     if (millis() > t + serialPrintInterval) {
           tempweight = LoadCell.getData();
-          i = (tempweight-offset)/28.35;
+          i = (tempweight)/28.35;
           Serial.print(tempweight);
           Serial.print(" ");
-          newDataReady = 0;
-          t = millis();
-          /*
-          lcd.setCursor(0, 0);                      //set the cursor to the lower left position
-          lcd.print("Weight: ");
-          lcd.print(i);
-          lcd.print(" oz");
-          */
           newDataReady = 0;
           t = millis();
         }
@@ -137,17 +126,15 @@ void loop()
     if(buttonCnt == 4){
       buttonCnt = 0; // we only have 3 states so we want to bring it back down to 0 after it hits 3 (remember index starts at 0)
     }
-    delay(50); // this code executes fast, we want it to slow down a little bit so we make it wait 50 mili here
-    //Serial.print(buttonCnt);
 
    
   }
   prevbuttonState = buttonState; 
   
   buttonState1 = digitalRead(button1);
-  if(buttonState1 == HIGH && buttonState1 != prevbuttonState1){
-  //  lcd.clear();
-//    lcd.setCursor(0, 0);                      //set the cursor to the lower left position
+  Serial.print(buttonState1);
+  Serial.print(" ");
+  if(buttonState1 == 0 && buttonState1 != prevbuttonState1){
     Serial.print("Taring... ");
     LoadCell.tareNoDelay();
   }
@@ -189,9 +176,19 @@ void loop()
   // Now let's use the above functions to combine them into one statement:
 
   float low, high;
-  tft.fillScreen(BLACK);
+  /*
   tft.setCursor(0,0);
-  tft.println(i);
+  tft.setTextColor(BLACK);
+  if(!setprevi){
+    previ = i;
+    setprevi = true;
+  }
+  tft.print(previ);
+  tft.setTextColor(WHITE);
+  tft.print(i);
+  previ = i;
+  */
+  
   if(buttonCnt == 1) // Chicken                                                 // then...
   {
     //Light 3 off
@@ -234,8 +231,8 @@ void loop()
     green_light_pin = 27; // UNO 4
     blue_light_pin = 29; 
     RGB_color(0, 255, 0); // Green
-  low = 8.0;
-  high = 8.3;
+    low = 8.0;
+    high = 8.3;
   
 
   }
@@ -250,14 +247,14 @@ if(buttonCnt == 3) // PB                                                  // the
     red_light_pin= 50; // UNO 5 
     green_light_pin = 48; // UNO 4
     blue_light_pin = 46; 
-    RGB_color(255, 255, 0); // Yellow
+    RGB_color(255,255,0); // Yellow
     low = 8.4;
     high = 8.7;
 
   }
 
    
-   if(low <= i && i <= high){ //solid range
+   if(low <= i && i <= high && change != 0){ //solid range
           /*
           lcd.setCursor(0, 0);                      //set the cursor to the lower left position
           lcd.print("Weight: ");
@@ -266,8 +263,21 @@ if(buttonCnt == 3) // PB                                                  // the
           lcd.setCursor(0, 1);
           lcd.print(":)");
           */
+          //Make rest blank
+          tft.fillRect(125,83,70,315,BLACK);
+          tft.fillRect(125,83,70,315,BLACK);
+          tft.fillRect(30,210,270,70,BLACK);
+          
+          //Draw Smiley
+          tft.drawRoundRect(170, 115, 100, 100, 50, YELLOW);
+          tft.drawRoundRect(170, 265, 100, 100, 50, YELLOW);
+
+          //tft.drawRoundRect(0, 0, 140, 140, 70, GREEN);
+          tft.fillRoundRect(80, 155, 70, 170, 70, YELLOW);
+          tft.fillRoundRect(86, 155, 70, 170, 70, BLACK);
+          change = 0;
    }
-   if(low > i){ // add more
+   if(low > i && change != 1){ // add more
     /*
           lcd.setCursor(0, 0);                      //set the cursor to the lower left position
           lcd.print("Weight: ");
@@ -275,8 +285,18 @@ if(buttonCnt == 3) // PB                                                  // the
           lcd.print(" oz ");
           lcd.setCursor(0, 1);
           lcd.print("+ ");*/
+          //Make rest blank
+          tft.fillRect(125,83,70,315,BLACK);
+          tft.drawRoundRect(170, 115, 100, 100, 50, BLACK);
+          tft.drawRoundRect(170, 265, 100, 100, 50, BLACK);
+          tft.fillRoundRect(80, 155, 70, 170, 70, BLACK);
+          tft.fillRoundRect(86, 155, 70, 170, 70, BLACK);
+          //Draw Plus
+          tft.fillRect(125,83,70,315,YELLOW);
+          tft.fillRect(30,210,270,70,YELLOW);
+          change = 1;
    }
-    if(high < i){ // take out
+    if(high < i && change != 2){ // take out
       /*
           lcd.setCursor(0, 0);                      //set the cursor to the lower left position
           lcd.print("Weight: ");
@@ -284,6 +304,17 @@ if(buttonCnt == 3) // PB                                                  // the
           lcd.print(" oz");
           lcd.setCursor(0, 1);
           lcd.print("- ");*/
+          //Make rest blank
+          tft.fillRect(125,83,70,315,BLACK);
+          tft.fillRect(30,210,270,70,BLACK);
+          tft.drawRoundRect(170, 115, 100, 100, 50, BLACK);
+          tft.drawRoundRect(170, 265, 100, 100, 50, BLACK);
+          tft.fillRoundRect(80, 155, 70, 170, 70, BLACK);
+          tft.fillRoundRect(86, 155, 70, 170, 70, BLACK);
+
+          //Draw Minus
+          tft.fillRect(125,83,70,315,YELLOW);
+          change = 2;
    }
   // As you can see, logic operators can be combined to make
   // complex decisions!
